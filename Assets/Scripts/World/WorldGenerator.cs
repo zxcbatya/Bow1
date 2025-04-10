@@ -4,6 +4,7 @@ using UnityEngine;
 using Utils;
 using System.Collections.Generic;
 using Enemies;
+using World.Score;
 
 namespace World
 {
@@ -32,7 +33,12 @@ namespace World
         [SerializeField] private float sideBlockChance = 0.7f; 
         [SerializeField] private int rowCount = 3;
         [SerializeField] private float rowSpacing = 3.0f;    
-        [SerializeField] private float skeletonChance = 0.25f; 
+        [SerializeField] private float skeletonChance = 0.25f;
+        [SerializeField] private int maxBlocksInMemory = 3000; // Максимальное количество блоков в памяти
+        [SerializeField] private float cleanupDistance = 150f; // Дистанция для очистки блоков
+        
+        [Header("Компоненты")]
+        [SerializeField] private ScoreManager scoreManager;
         
         private Transform _container;
         private ObjectPool _blockPool;
@@ -47,6 +53,7 @@ namespace World
         private int _maxRecentBlocksCount = 20; // Количество последних блоков для проверки
         private Dictionary<Vector3Int, GameObject> _blockGrid = new Dictionary<Vector3Int, GameObject>(); // Сетка для быстрой проверки позиций
         private Vector3Int _lastPlayerGridPos = Vector3Int.zero; // Последняя позиция игрока в сетке
+        private Queue<GameObject> _blockQueue = new Queue<GameObject>(); // Очередь для управления блоками
         
         // Для отладки
         private List<Vector3> _spiralPoints = new List<Vector3>();
@@ -56,12 +63,18 @@ namespace World
             _container = new GameObject("WorldContainer").transform;
             
             // Увеличиваем размер пулов для большого числа блоков
-            _blockPool = new ObjectPool(blockPrefab, 2000); // Увеличено до 2000 блоков
-            _enemyPool = new ObjectPool(enemyPrefab, 100); // Увеличено до 100 скелетов
+            _blockPool = new ObjectPool(blockPrefab, maxBlocksInMemory);
+            _enemyPool = new ObjectPool(enemyPrefab, 100);
             
             spiralRadius = Mathf.Clamp(spiralRadius, minRadius, maxRadius);
             _currentAngle = 0f;
             _currentHeight = 0f;
+            
+            // Находим ScoreManager, если он не назначен
+            if (scoreManager == null)
+            {
+                scoreManager = FindObjectOfType<ScoreManager>();
+            }
             
             Debug.Log($"World initialized with spiral radius: {spiralRadius} and {rowCount} rows");
         }
@@ -158,24 +171,59 @@ namespace World
         // Управляет видимостью блоков, активируя только те, что близко к игроку
         private void ManageBlockVisibility()
         {
-            // Если блоков мало, нет смысла оптимизировать
             if (_currentBlockCount < visibleDistance * 2) return;
+            
+            Vector3 playerPos = _player.transform.position;
+            List<GameObject> blocksToRemove = new List<GameObject>();
             
             foreach (GameObject block in blocks)
             {
                 if (block == null) continue;
                 
-                float distance = Vector3.Distance(_player.transform.position, block.transform.position);
+                float distance = Vector3.Distance(playerPos, block.transform.position);
                 
-                // Блоки в пределах видимости активны, дальние деактивированы
                 if (distance < visibleDistance)
                 {
-                    if (!block.activeSelf) block.SetActive(true);
+                    if (!block.activeSelf)
+                    {
+                        block.SetActive(true);
+                        // Активируем триггер, если он есть
+                        BlockTrigger trigger = block.GetComponent<BlockTrigger>();
+                        if (trigger != null)
+                        {
+                            trigger.enabled = true;
+                        }
+                    }
                 }
                 else
                 {
-                    if (block.activeSelf) block.SetActive(false);
+                    if (block.activeSelf)
+                    {
+                        // Отключаем только визуальную часть, но оставляем триггер активным
+                        Renderer renderer = block.GetComponent<Renderer>();
+                        if (renderer != null)
+                        {
+                            renderer.enabled = false;
+                        }
+                        
+                        // Если блок слишком далеко, помечаем его для удаления
+                        if (distance > cleanupDistance)
+                        {
+                            blocksToRemove.Add(block);
+                        }
+                    }
                 }
+            }
+            
+            // Удаляем дальние блоки и возвращаем их в пул
+            foreach (GameObject block in blocksToRemove)
+            {
+                Vector3Int gridPos = GetGridPosition(block.transform.position);
+                _blockGrid.Remove(gridPos);
+                blocks.Remove(block);
+                _recentBlocks.Remove(block);
+                _blockPool.ReturnObject(block);
+                _currentBlockCount--;
             }
         }
         
@@ -276,61 +324,77 @@ namespace World
         
         private bool CreateBlockAt(Vector3 position)
         {
-            // Проверяем, нет ли уже блока рядом
             if (!IsValidPosition(position)) return false;
             
-            // Проверяем, что пул блоков инициализирован
-            if (_blockPool == null) 
+            if (_blockPool == null)
             {
                 Debug.LogError("Block pool is not initialized!");
                 return false;
             }
             
-            // Берем блок из пула
+            // Проверяем, не превышен ли лимит блоков в памяти
+            if (_currentBlockCount >= maxBlocksInMemory)
+            {
+                // Находим самый дальний блок и переиспользуем его
+                GameObject farthestBlock = FindFarthestBlock();
+                if (farthestBlock != null)
+                {
+                    Vector3Int oldGridPos = GetGridPosition(farthestBlock.transform.position);
+                    _blockGrid.Remove(oldGridPos);
+                    blocks.Remove(farthestBlock);
+                    _recentBlocks.Remove(farthestBlock);
+                    
+                    // Переиспользуем блок
+                    farthestBlock.transform.position = position;
+                    farthestBlock.transform.rotation = Quaternion.identity;
+                    
+                    // Обновляем сетку и списки
+                    _blockGrid[GetGridPosition(position)] = farthestBlock;
+                    blocks.Add(farthestBlock);
+                    _recentBlocks.Add(farthestBlock);
+                    
+                    // Обновляем BlockTrigger
+                    BlockTrigger trigger = farthestBlock.GetComponent<BlockTrigger>();
+                    if (trigger != null)
+                    {
+                        float distance = Mathf.Sqrt(position.x * position.x + position.z * position.z);
+                        int row = 0;
+                        if (distance < spiralRadius * 0.9f) row = 0;
+                        else if (distance < spiralRadius * 1.1f) row = 1;
+                        else row = Mathf.CeilToInt((distance - spiralRadius) / rowSpacing) + 1;
+                        trigger.SetRow(row);
+                    }
+                    
+                    return true;
+                }
+                return false;
+            }
+            
             GameObject block = _blockPool.GetObject();
             if (block == null) return false;
             
-            // Устанавливаем позицию и родителя
             block.transform.position = position;
             block.transform.rotation = Quaternion.identity;
             block.transform.SetParent(_container);
             
-            // Устанавливаем номер ряда для BlockTrigger
-            BlockTrigger trigger = block.GetComponent<BlockTrigger>();
-            if (trigger != null)
+            BlockTrigger blockTrigger = block.GetComponent<BlockTrigger>();
+            if (blockTrigger != null)
             {
-                // Для основного спирального ряда - ряд 0
-                // Для внешних рядов - ряд N в зависимости от расстояния от центра
                 float distance = Mathf.Sqrt(position.x * position.x + position.z * position.z);
-                
-                // Определяем номер ряда на основе радиуса позиции
                 int row = 0;
-                if (distance < spiralRadius * 0.9f)
-                {
-                    row = 0; // Внутренние блоки
-                }
-                else if (distance < spiralRadius * 1.1f)
-                {
-                    row = 1; // Основной ряд спирали
-                }
-                else
-                {
-                    // Вычисляем номер внешнего ряда
-                    row = Mathf.CeilToInt((distance - spiralRadius) / rowSpacing) + 1;
-                }
-                
-                trigger.SetRow(row);
+                if (distance < spiralRadius * 0.9f) row = 0;
+                else if (distance < spiralRadius * 1.1f) row = 1;
+                else row = Mathf.CeilToInt((distance - spiralRadius) / rowSpacing) + 1;
+                blockTrigger.SetRow(row);
             }
             
-            // Добавляем в списки блоков
             blocks.Add(block);
             _blockGrid[GetGridPosition(position)] = block;
             
-            // Добавляем в список последних блоков для оптимизации проверки коллизий
             _recentBlocks.Add(block);
             if (_recentBlocks.Count > _maxRecentBlocksCount)
             {
-                _recentBlocks.RemoveAt(0); // Удаляем самый старый блок из списка
+                _recentBlocks.RemoveAt(0);
             }
             
             _currentBlockCount++;
@@ -339,11 +403,9 @@ namespace World
         
         private bool IsValidPosition(Vector3 position)
         {
-            // Используем сетку для быстрой проверки соседних ячеек
             Vector3Int gridPos = GetGridPosition(position);
             float minDistance = blockSpacing * 0.8f; // Увеличено для предотвращения перекрытий
             
-            // Проверяем текущую и соседние ячейки сетки (расширенный диапазон поиска)
             for (int x = -2; x <= 2; x++)
             {
                 for (int y = -2; y <= 2; y++)
@@ -379,6 +441,29 @@ namespace World
             }
             
             return true;
+        }
+        
+        private GameObject FindFarthestBlock()
+        {
+            if (_player == null || blocks.Count == 0) return null;
+            
+            GameObject farthestBlock = null;
+            float maxDistance = 0f;
+            Vector3 playerPos = _player.transform.position;
+            
+            foreach (GameObject block in blocks)
+            {
+                if (block == null) continue;
+                
+                float distance = Vector3.Distance(playerPos, block.transform.position);
+                if (distance > maxDistance)
+                {
+                    maxDistance = distance;
+                    farthestBlock = block;
+                }
+            }
+            
+            return farthestBlock;
         }
         
         private void TrySpawnSkeleton(Vector3 position)
@@ -539,13 +624,14 @@ namespace World
             _currentAngle = 0f;
             _currentHeight = 0f;
             
-            try
+            // Сбрасываем счет через ScoreManager
+            if (scoreManager != null)
             {
-                BlockTrigger.ResetScore();
+                scoreManager.ResetScore();
             }
-            catch (Exception e)
+            else
             {
-                Debug.LogWarning("Failed to reset score: " + e.Message);
+                Debug.LogWarning("ScoreManager not found, score will not be reset");
             }
             
             StartCoroutine(InitializeWorldCoroutine());

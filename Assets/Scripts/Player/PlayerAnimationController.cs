@@ -13,9 +13,9 @@ namespace Player
         private static readonly int FireIdleState = Animator.StringToHash("FireIdle");
         private static readonly int FireEndState = Animator.StringToHash("FireEnd");
         
-        // Параметры аниматора
+        // Параметры аниматора - точно как в Unity Animator
         private static readonly int IsMovingParam = Animator.StringToHash("isMoving");
-        private static readonly int IsDrawingBowParam = Animator.StringToHash("isDrawingBow");
+        private static readonly int IsDrawingBowParam = Animator.StringToHash("isDrawningBow");
         private static readonly int ReleaseArrowParam = Animator.StringToHash("releaseArrow");
         
         private bool isDrawingBow = false;
@@ -25,6 +25,13 @@ namespace Player
             if (animator == null)
             {
                 animator = GetComponent<Animator>();
+            }
+            
+            // Проверяем параметры при старте
+            Debug.Log("Checking animator parameters:");
+            foreach (AnimatorControllerParameter param in animator.parameters)
+            {
+                Debug.Log($"Parameter: {param.name}, Type: {param.type}");
             }
         }
     
@@ -36,6 +43,7 @@ namespace Player
                 animator.SetBool(IsDrawingBowParam, false);
                 animator.SetBool(ReleaseArrowParam, false);
             }
+            Debug.Log($"PlayIdle: isMoving={animator.GetBool(IsMovingParam)}, isDrawingBow={animator.GetBool(IsDrawingBowParam)}");
         }
     
         public void StartDrawingBow()
@@ -43,12 +51,13 @@ namespace Player
             isDrawingBow = true;
             animator.SetBool(IsDrawingBowParam, true);
             animator.SetBool(ReleaseArrowParam, false);
+            Debug.Log($"StartDrawingBow: isDrawingBow={animator.GetBool(IsDrawingBowParam)}, releaseArrow={animator.GetBool(ReleaseArrowParam)}");
         }
         
         public void BowDrawn()
         {
-            // Вызывается после завершения анимации натягивания лука
             animator.SetBool(IsDrawingBowParam, true);
+            Debug.Log($"BowDrawn: isDrawingBow={animator.GetBool(IsDrawingBowParam)}");
         }
     
         public void ReleaseArrow()
@@ -56,6 +65,7 @@ namespace Player
             isDrawingBow = false;
             animator.SetBool(IsDrawingBowParam, false);
             animator.SetBool(ReleaseArrowParam, true);
+            Debug.Log($"ReleaseArrow: isDrawingBow={animator.GetBool(IsDrawingBowParam)}, releaseArrow={animator.GetBool(ReleaseArrowParam)}");
         }
     
         public void PlayWalk()
@@ -66,9 +76,9 @@ namespace Player
                 animator.SetBool(IsDrawingBowParam, false);
                 animator.SetBool(ReleaseArrowParam, false);
             }
+            Debug.Log($"PlayWalk: isMoving={animator.GetBool(IsMovingParam)}, isDrawingBow={animator.GetBool(IsDrawingBowParam)}");
         }
     
-        // Получение текущего состояния анимации
         public bool IsPlayingAnimation(string animationName)
         {
             return animator.GetCurrentAnimatorStateInfo(0).IsName(animationName);

@@ -47,8 +47,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Scripts\Enemies\EnemySkeleton.cs" />
+    <Compile Include="Assets\Scripts\World\Score\ScoreView.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerShoting.cs" />
     <Compile Include="Assets\Scripts\World\DifficultyManager.cs" />
+    <Compile Include="Assets\Scripts\World\Score\ScoreModel.cs" />
     <Compile Include="Assets\Scripts\World\ScoreCounter.cs" />
     <Compile Include="Assets\Scripts\Utils\ObjectPool.cs" />
     <Compile Include="Assets\Scripts\World\ScoreDisplay.cs" />

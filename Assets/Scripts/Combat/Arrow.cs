@@ -75,7 +75,6 @@ namespace Combat
             _isEnemyArrow = isEnemy;
             _hasHit = false;
             
-            // Повторная проверка компонентов
             if (_rb == null) _rb = GetComponent<Rigidbody>();
             if (_rb == null) _rb = gameObject.AddComponent<Rigidbody>();
             
@@ -88,19 +87,15 @@ namespace Combat
                 ((CapsuleCollider)_collider).direction = 2;
             }
             
-            // Устанавливаем урон в зависимости от силы натяжения
             damage *= chargePower;
             
-            // Устанавливаем теги
             gameObject.tag = _isEnemyArrow ? "EnemyArrow" : "PlayerArrow";
             
-            // Уничтожаем стрелу через lifetime секунд
             Destroy(gameObject, lifetime);
         }
         
         private void Update()
         {
-            // Если стрела двигается, ориентируем ее по направлению движения
             if (!_hasHit && _rb != null && _rb.linearVelocity.sqrMagnitude > 0.1f)
             {
                 transform.rotation = Quaternion.LookRotation(_rb.linearVelocity);
@@ -112,9 +107,7 @@ namespace Combat
             if (_hasHit) return;
             _hasHit = true;
             
-            Debug.Log($"Arrow hit: {collision.gameObject.name} with tag: {collision.gameObject.tag}");
             
-            // Останавливаем движение стрелы
             if (_rb != null)
             {
                 _rb.linearVelocity = Vector3.zero;
@@ -124,7 +117,6 @@ namespace Combat
             
             if (_isEnemyArrow)
             {
-                // Если это вражеская стрела и она попала в игрока
                 if (collision.gameObject.CompareTag("Player"))
                 {
                     PlayerHealth playerHealth = collision.gameObject.GetComponent<PlayerHealth>();
@@ -133,21 +125,17 @@ namespace Combat
                         playerHealth.TakeDamage(damage);
                     }
                     
-                    Debug.Log("Enemy arrow hit player!");
                 }
             }
             else
             {
-                // Если это стрела игрока и она попала в скелета
                 EnemySkeleton skeleton = collision.gameObject.GetComponent<EnemySkeleton>();
                 if (skeleton != null)
                 {
                     skeleton.TakeDamage();
-                    Debug.Log("Player arrow hit skeleton directly!");
                 }
                 else
                 {
-                    // Проверяем, есть ли скелет в родителе объекта
                     Transform parent = collision.transform.parent;
                     if (parent != null)
                     {
@@ -155,20 +143,17 @@ namespace Combat
                         if (skeleton != null)
                         {
                             skeleton.TakeDamage();
-                            Debug.Log("Player arrow hit skeleton through parent!");
                         }
                     }
                 }
             }
             
-            // Создаём эффект попадания
             if (hitEffect != null)
             {
                 Instantiate(hitEffect, transform.position, Quaternion.identity);
             }
             
-            // Уничтожаем стрелу
-            Destroy(gameObject, 0.2f); // Небольшая задержка для визуального эффекта
+            Destroy(gameObject, 0.2f); 
         }
     }
 } 

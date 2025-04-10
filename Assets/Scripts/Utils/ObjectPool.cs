@@ -31,7 +31,6 @@ namespace Utils
             _pool = new List<GameObject>(_size);
             _activeObjects = new List<GameObject>(_size);
             
-            Debug.Log($"Creating new {_poolName} with size {_size}");
             InitializePool();
         }
         
@@ -49,7 +48,6 @@ namespace Utils
                 }
             }
             
-            Debug.Log($"{_poolName} initialized with {_pool.Count} objects");
         }
         
         private GameObject CreateNewObject()
@@ -62,7 +60,6 @@ namespace Utils
                 obj.transform.SetParent(_parent);
             }
             
-            // Добавляем уникальное имя для отслеживания объектов пула
             obj.name = $"{_prefab.name}_Pooled_{_pool.Count + _activeObjects.Count}";
             
             return obj;
@@ -75,7 +72,6 @@ namespace Utils
         {
             if (_prefab == null)
             {
-                Debug.LogError($"{_poolName}: Cannot get object - prefab is null!");
                 return null;
             }
             
@@ -85,7 +81,6 @@ namespace Utils
             if (_pool.Count == 0)
             {
                 // Если пул пуст, создаем новый объект
-                Debug.Log($"{_poolName}: Pool is empty, creating new object");
                 GameObject newObj = CreateNewObject();
                 if (newObj != null)
                 {
@@ -103,7 +98,6 @@ namespace Utils
             if (obj == null)
             {
                 // Если объект был уничтожен, создаем новый
-                Debug.LogWarning($"{_poolName}: Object in pool was destroyed, creating new one");
                 obj = CreateNewObject();
                 if (obj == null) return null;
             }
@@ -111,7 +105,6 @@ namespace Utils
             obj.SetActive(true);
             _activeObjects.Add(obj);
             
-            Debug.Log($"{_poolName}: Retrieved object {obj.name}, {_pool.Count} left in pool, {_activeObjects.Count} active");
             return obj;
         }
         
@@ -122,14 +115,12 @@ namespace Utils
         {
             if (obj == null)
             {
-                Debug.LogWarning($"{_poolName}: Attempted to return null object to pool");
                 return;
             }
             
             // Проверяем, является ли объект частью этого пула
             if (!_activeObjects.Contains(obj))
             {
-                Debug.LogWarning($"{_poolName}: Object {obj.name} is not from this pool!");
                 return;
             }
             
@@ -149,7 +140,6 @@ namespace Utils
             if (obj != null)
             {
                 _pool.Add(obj);
-                Debug.Log($"{_poolName}: Returned object {obj.name} to pool, now {_pool.Count} in pool, {_activeObjects.Count} active");
             }
         }
         
@@ -158,7 +148,6 @@ namespace Utils
         /// </summary>
         public void ReturnAllObjects()
         {
-            Debug.Log($"{_poolName}: Returning all {_activeObjects.Count} active objects to pool");
             
             // Создаем копию списка, так как будем модифицировать оригинал в цикле
             List<GameObject> activeObjectsCopy = new List<GameObject>(_activeObjects);
@@ -173,21 +162,17 @@ namespace Utils
                 {
                     // Удаляем null объекты из списка активных
                     _activeObjects.Remove(obj);
-                    Debug.LogWarning($"{_poolName}: Removed null object from active list");
                 }
             }
             
-            // На всякий случай очищаем список активных объектов
             _activeObjects.Clear();
             
-            // Очищаем недействительные элементы в пуле
             int removed = _pool.RemoveAll(item => item == null);
             if (removed > 0)
             {
                 Debug.LogWarning($"{_poolName}: Removed {removed} null objects from pool");
             }
             
-            Debug.Log($"{_poolName}: All objects returned, now {_pool.Count} in pool, {_activeObjects.Count} active");
         }
         
         /// <summary>
@@ -197,7 +182,6 @@ namespace Utils
         {
             if (additionalSize <= 0) return;
             
-            Debug.Log($"{_poolName}: Expanding pool by {additionalSize} objects");
             
             for (int i = 0; i < additionalSize; i++)
             {
@@ -210,7 +194,6 @@ namespace Utils
             }
             
             _size += additionalSize;
-            Debug.Log($"{_poolName}: Pool expanded to {_size} total capacity, {_pool.Count} available");
         }
     }
 } 

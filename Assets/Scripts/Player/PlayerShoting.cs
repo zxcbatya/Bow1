@@ -36,24 +36,23 @@ public class PlayerShoting : MonoBehaviour
     private void HandleBowInput()
     {
         // Начало натяжения лука
-        if (Input.GetButtonDown("Fire1") && !isDrawingBow)
+        if (Input.GetMouseButton(1) && !isDrawingBow)
         {
             isDrawingBow = true;
             animationController.StartDrawingBow();
         }
         
         // Удержание натянутого лука
-        if (Input.GetButton("Fire1") && isDrawingBow)
+        if (Input.GetMouseButton(1) && isDrawingBow)
         {
-            // Лук уже натянут, держим анимацию FireIdle
             if (animationController.IsBowDrawn())
             {
-                // Можно добавить дополнительную логику для прицеливания
+                animationController.BowDrawn();
             }
         }
         
         // Отпускание стрелы
-        if (Input.GetButtonUp("Fire1") && isDrawingBow)
+        if (Input.GetMouseButtonUp(1) && isDrawingBow)
         {
             ShootArrow();
             isDrawingBow = false;
@@ -76,15 +75,10 @@ public class PlayerShoting : MonoBehaviour
             }
         }
         
-        // Альтернативно, можно использовать Raycast для мгновенного попадания
         RaycastHit hit;
         if (Physics.Raycast(mainCamera.transform.position, mainCamera.transform.forward, out hit, range, shootableLayers))
         {
-            PlayerHealth target = hit.transform.GetComponent<PlayerHealth>();
-            if (target != null)
-            {
-                target.TakeDamage(damage);
-            }
+            // Логика попадания
         }
     }
 }
