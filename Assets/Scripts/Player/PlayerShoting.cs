@@ -1,84 +1,56 @@
-using Player;
 using UnityEngine;
+using ObjectPool = World.ObjectPool;
 
-public class PlayerShoting : MonoBehaviour
+namespace Player
 {
-    [Header("Стрельба")]
-    [SerializeField] private float drawSpeed = 0.5f; // Скорость натяжения лука
-    [SerializeField] private float damage = 10f;
-    [SerializeField] private float range = 100f;
-    [SerializeField] private Transform arrowSpawnPoint;
-    [SerializeField] private GameObject arrowPrefab; // Префаб стрелы
-    [SerializeField] private LayerMask shootableLayers;
-    
-    [Header("Компоненты")]
-    [SerializeField] private PlayerAnimationController animationController;
-    
-    private bool isDrawingBow = false;
-    private Camera mainCamera;
-    
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    private void Start()
+    public class PlayerShoting : MonoBehaviour
     {
-        mainCamera = Camera.main;
-        if (animationController == null)
-        {
-            animationController = GetComponent<PlayerAnimationController>();
-        }
-    }
+        [Header("Настройки стрельбы")] [SerializeField]
+        private GameObject arrowPrefab;
 
-    // Update is called once per frame
-    private void Update()
-    {
-        HandleBowInput();
-    }
-    
-    private void HandleBowInput()
-    {
-        // Начало натяжения лука
-        if (Input.GetMouseButton(1) && !isDrawingBow)
+        [SerializeField] private Transform shootPoint;
+        [SerializeField] private float shootForce = 20f;
+        [SerializeField] private float shootCooldown = 0.5f;
+
+        private float _nextShootTime;
+        private ObjectPool _arrowPool;
+
+        private void Start()
         {
-            isDrawingBow = true;
-            animationController.StartDrawingBow();
-        }
-        
-        // Удержание натянутого лука
-        if (Input.GetMouseButton(1) && isDrawingBow)
-        {
-            if (animationController.IsBowDrawn())
+            if (shootPoint == null)
             {
-                animationController.BowDrawn();
+                Debug.LogError($"ShootPoint не назначен в {gameObject.name}!");
+                enabled = false;
+                return;
+            }
+
+            _arrowPool = new ObjectPool(arrowPrefab, 10);
+        }
+
+        private void Update()
+        {
+            if (Input.GetMouseButtonDown(0) && Time.time >= _nextShootTime)
+            {
+                Shoot();
             }
         }
-        
-        // Отпускание стрелы
-        if (Input.GetMouseButtonUp(1) && isDrawingBow)
+
+        private void Shoot()
         {
-            ShootArrow();
-            isDrawingBow = false;
-            animationController.ReleaseArrow();
-        }
-    }
-    
-    private void ShootArrow()
-    {
-        if (arrowPrefab != null && arrowSpawnPoint != null)
-        {
-            // Создаем стрелу
-            GameObject arrow = Instantiate(arrowPrefab, arrowSpawnPoint.position, arrowSpawnPoint.rotation);
-            Rigidbody arrowRb = arrow.GetComponent<Rigidbody>();
-            
-            if (arrowRb != null)
+            GameObject arrow = _arrowPool.GetObject();
+            if (arrow != null)
             {
-                // Запускаем стрелу в направлении взгляда камеры
-                arrowRb.linearVelocity = mainCamera.transform.forward * 30f; // Скорость стрелы
+                arrow.transform.position = shootPoint.position;
+                arrow.transform.rotation = shootPoint.rotation;
+
+                Rigidbody rb = arrow.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = shootPoint.forward * shootForce;
+                }
+
+                _nextShootTime = Time.time + shootCooldown;
             }
-        }
-        
-        RaycastHit hit;
-        if (Physics.Raycast(mainCamera.transform.position, mainCamera.transform.forward, out hit, range, shootableLayers))
-        {
-            // Логика попадания
         }
     }
 }

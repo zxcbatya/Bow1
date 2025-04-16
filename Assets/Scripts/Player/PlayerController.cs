@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Player
 {
-    public class PlayerMovement : MonoBehaviour
+    public class PlayerController : MonoBehaviour
     {
         [SerializeField] 
         private Transform orientation;
@@ -187,8 +187,7 @@ namespace Player
             }
             else if (!IsGrounded)
             {
-                _rb.AddForce(_moveDirection.normalized * moveSpeed * MovementMultiplier * airMultiplier,
-                    ForceMode.Acceleration);
+                _rb.AddForce(_moveDirection.normalized * moveSpeed * MovementMultiplier * airMultiplier, ForceMode.Acceleration);
             }
             else if (isCrouching)
             {

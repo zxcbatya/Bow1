@@ -1,189 +1,165 @@
+using System;
 using UnityEngine;
 using System.Collections;
-using Utils;
+using Enemies.Enemies.Components;
+using World;
+using Random = UnityEngine.Random;
 
 namespace Enemies
 {
     public class EnemySkeleton : MonoBehaviour
     {
-        [Header("Настройки стрельбы")]
-        [SerializeField] private float shootInterval = 2f;
-        [SerializeField] private float arrowSpeed = 10f;
-        [SerializeField] private float aimHeight = 1.5f;
+        [Header("Стрельба")]
+        [SerializeField] private float _shootInterval = 2f;
+        [SerializeField] private float _arrowSpeed = 10f;
+        [SerializeField] private float _aimHeight = 1.5f;
         
         [Header("Ссылки")]
-        [SerializeField] private GameObject arrowPrefab;
-        [SerializeField] private Transform shootPoint;
-        
+        [SerializeField] private Transform _shootPoint;
+        [SerializeField] private GameObject _arrowPrefab;
+
+        private IPoolManager _poolManager;
         private Transform _player;
+        private EnemyStateController _stateController;
         private float _shootTimer;
-        private ObjectPool _arrowPool;
-        private bool _isInitialized;
-        
+
+        #region Инициализация
+        public void Initialize(IPoolManager poolManager, Transform player)
+        {
+            _poolManager = poolManager;
+            _player = player;
+            _stateController = GetComponent<EnemyStateController>();
+            
+            SetupShootPoint();
+            ValidateComponents();
+            
+            _stateController.OnDeath += HandleDeath;
+            _stateController.OnReset += ResetEnemy;
+        }
+
         private void Awake()
         {
-            if (shootPoint == null)
-            {
-                shootPoint = transform.Find("ShootPoint");
-                if (shootPoint == null)
-                {
-                    shootPoint = new GameObject("ShootPoint").transform;
-                    shootPoint.SetParent(transform);
-                    shootPoint.localPosition = new Vector3(0, -1.21f, 0.59f);
-                }
-            }
-            
-            if (arrowPrefab != null)
-            {
-                _arrowPool = new ObjectPool(arrowPrefab, 5);
-            }
+                Initialize(_poolManager, _player);
+        }
 
-            
-            if (!gameObject.CompareTag("Enemy"))
-            {
-                gameObject.tag = "Enemy";
-            }
-        }
-        
-        public void Initialize(Transform player)
+        private void Start() 
         {
-            if (player == null)
-            {
-                return;
-            }
-            
-            _player = player;
-            _isInitialized = true;
-            _shootTimer = Random.Range(0f, shootInterval * 0.5f); 
-        }
-        
-        private void OnEnable()
-        {
-            _shootTimer = Random.Range(0f, shootInterval * 0.5f);
-        }
-        
-        private void Update()
-        {
-            if (!_isInitialized)
-            {
-                return;
-            }
-            
             if (_player == null)
             {
-                return;
-            }
-            
-            float distanceToPlayer = Vector3.Distance(transform.position, _player.position);
-            
-            if (distanceToPlayer <= 40f)
-            {
-                Vector3 targetPosition = _player.position + Vector3.up * aimHeight;
-                Vector3 lookDirection = targetPosition - transform.position;
-                
-                lookDirection.y = 0;
-                
-                if (lookDirection != Vector3.zero)
-                {
-                    Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
-                    Quaternion newRotation = Quaternion.Euler(
-                        transform.rotation.eulerAngles.x,
-                        targetRotation.eulerAngles.y,
-                        transform.rotation.eulerAngles.z);
-                    transform.rotation = newRotation;
-                    
-                    Vector3 preciseDirection = (targetPosition - shootPoint.position).normalized;
-                    shootPoint.rotation = Quaternion.LookRotation(preciseDirection);
-                }
-                
-                _shootTimer += Time.deltaTime;
-                
-                if (_shootTimer >= shootInterval)
-                {
-                    _shootTimer = 0f;
-                    Shoot();
-                }
+                _player = GameObject.FindGameObjectWithTag("Player").transform;
             }
         }
-        
+
+        private void SetupShootPoint()
+        {
+            if (_shootPoint == null)
+            {
+                _shootPoint = new GameObject("ShootPoint").transform;
+                _shootPoint.SetParent(transform);
+                _shootPoint.localPosition = new Vector3(0, -1.21f, 0.59f);
+            }
+        }
+
+        private void ValidateComponents()
+        {
+            if (_arrowPrefab == null)
+                Debug.LogError("Arrow prefab not set!", this);
+        }
+        #endregion
+
+        #region Update logic
+        private void Update()
+        {
+            if (!_stateController.IsActive) return;
+            
+            UpdateAim();
+            UpdateShooting();
+        }
+
+        private void UpdateAim()
+        {
+            Vector3 targetPosition = _player.position + Vector3.up * _aimHeight;
+            Vector3 lookDirection = targetPosition - transform.position;
+            lookDirection.y = 0;
+
+            if (lookDirection != Vector3.zero)
+            {
+                transform.rotation = Quaternion.LookRotation(lookDirection);
+                _shootPoint.rotation = Quaternion.LookRotation(
+                    (targetPosition - _shootPoint.position).normalized);
+            }
+        }
+
+        private void UpdateShooting()
+        {
+            if (Vector3.Distance(transform.position, _player.position) > 40f) return;
+
+            _shootTimer += Time.deltaTime;
+            
+            if (_shootTimer >= _shootInterval)
+            {
+                _shootTimer = 0f;
+                Shoot();
+            }
+        }
+        #endregion
+
+        #region Shoting
         private void Shoot()
         {
-            if (!_isInitialized || _player == null)
+            GameObject arrow = _poolManager.GetEnemyProjectile();
+            if (arrow == null) return;
+
+            SetupArrow(arrow);
+            StartCoroutine(ReturnArrowAfterDelay(arrow));
+        }
+
+        private void SetupArrow(GameObject arrow)
+        {
+            arrow.transform.SetPositionAndRotation(
+                _shootPoint.position,
+                Quaternion.LookRotation(GetShootDirection())
+            );
+
+            if (arrow.TryGetComponent<Rigidbody>(out var rb))
             {
-                return;
-            }
-            
-            if (_arrowPool == null || arrowPrefab == null)
-            {
-                return;
-            }
-            
-            Vector3 targetPosition = _player.position + Vector3.up * aimHeight;
-            Vector3 direction = (targetPosition - shootPoint.position).normalized;
-            
-            GameObject arrow = _arrowPool.GetObject();
-            if (arrow == null)
-            {
-                Debug.LogError($"[{gameObject.name}] Failed to get arrow from pool!");
-                return;
-            }
-            
-            arrow.transform.position = shootPoint.position;
-            arrow.transform.rotation = Quaternion.LookRotation(direction);
-            
-            Rigidbody rb = arrow.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic = false;
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-                rb.linearVelocity = direction * arrowSpeed;
-                
-                arrow.transform.parent = null;
-                
-                if (!arrow.activeSelf)
-                {
-                    arrow.SetActive(true);
-                }
-                
-                
-                StartCoroutine(ReturnArrowToPoolDelayed(arrow));
+                rb.linearVelocity = GetShootDirection() * _arrowSpeed;
             }
         }
-        
-        private IEnumerator ReturnArrowToPoolDelayed(GameObject arrow)
+
+        private Vector3 GetShootDirection()
+        {
+            return (_player.position + Vector3.up * _aimHeight - _shootPoint.position).normalized;
+        }
+
+        private IEnumerator ReturnArrowAfterDelay(GameObject arrow)
         {
             yield return new WaitForSeconds(5f);
-            
-            if (arrow != null && arrow.activeSelf && _arrowPool != null)
-            {
-                _arrowPool.ReturnObject(arrow);
-            }
+            _poolManager.ReturnEnemyProjectile(arrow);
         }
-        
-        public void TakeDamage()
-        {
-            if (_arrowPool != null)
-            {
-                _arrowPool.ReturnAllObjects();
-            }
-            
-            gameObject.SetActive(false);
-        }
-        
-        private void OnDisable()
+        #endregion
+
+        #region Обработка событий
+        private void HandleDeath()
         {
             StopAllCoroutines();
+            _poolManager.ReturnEnemy(gameObject);
         }
-        
-        private void OnDrawGizmos()
+
+        private void ResetEnemy()
         {
-            if (shootPoint != null)
+            _shootTimer = Random.Range(0f, _shootInterval * 0.5f);
+        }
+        #endregion
+
+        private void OnDrawGizmosSelected()
+        {
+            if (_shootPoint != null)
             {
                 Gizmos.color = Color.red;
-                Gizmos.DrawSphere(shootPoint.position, 0.1f);
-                Gizmos.DrawRay(shootPoint.position, shootPoint.forward * 2f);
+                Gizmos.DrawSphere(_shootPoint.position, 0.1f);
+                Gizmos.DrawRay(_shootPoint.position, _shootPoint.forward * 2f);
             }
         }
     }
-} 
+}

@@ -1,50 +1,47 @@
-using System;
+using UI;
 using UnityEngine;
+using World;
 
 namespace Core
 {
     public class GameManager : MonoBehaviour
     {
-        public static GameManager Instance { get; private set; }
+        [Header("Dependencies")]
+        [SerializeField] private SpiralWorldGenerator _worldGenerator;
+        [SerializeField] private UIController _uiController;
     
-        public event Action OnGameStart;
-        public event Action OnGameOver;
+        private bool _isPaused;
 
-        private float Score { get; set; }
-        private float HighestPoint { get; set; }
-    
         private void Awake()
         {
-            if (Instance == null)
-            {
-                Instance = this;
-                DontDestroyOnLoad(gameObject);
-            }
-            else
-            {
-                Destroy(gameObject);
-            }
+            _uiController.Initialize(StartGame, ResumeGame);
+            _worldGenerator.GenerateInitial();
         }
-    
-        public void StartGame()
+
+        private void StartGame()
         {
-            Score = 0;
-            HighestPoint = 0;
-            OnGameStart?.Invoke();
+            _uiController.ShowGameUI();
+            Time.timeScale = 1f;
+            Cursor.lockState = CursorLockMode.Locked;
         }
-    
-        public void GameOver()
+
+        private void ResumeGame()
         {
-            OnGameOver?.Invoke();
+            _isPaused = false;
+            _uiController.ShowGameUI();
+            Time.timeScale = 1f;
+            Cursor.lockState = CursorLockMode.Locked;
         }
-    
-        public void UpdateScore(float height)
+
+        private void Update()
         {
-            if (height > HighestPoint)
+            if (Input.GetKeyDown(KeyCode.Escape))
             {
-                Score += (height - HighestPoint);
-                HighestPoint = height;
+                _isPaused = !_isPaused;
+                Time.timeScale = _isPaused ? 0 : 1;
+                _uiController.ShowPauseMenu();
+                Cursor.lockState = _isPaused ? CursorLockMode.None : CursorLockMode.Locked;
             }
         }
     }
-} 
+}

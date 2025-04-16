@@ -195,7 +195,7 @@ Transform:
   m_GameObject: {fileID: 1645636925973018793}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.114601, y: -0.0000038146973, z: -19.177643}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -228,15 +228,15 @@ MonoBehaviour:
   acceleration: 10
   cam: {fileID: 1281174387049997701}
   sprintFOV: 100
-  jumpForce: 50
-  jumpRate: 50
+  jumpForce: 100
+  jumpRate: 20
   crouchScale: 0.75
   crouchSpeed: 1.25
   jumpKey: 32
   sprintKey: 306
   crouchKey: 304
   groundDrag: 6
-  airDrag: 2
+  airDrag: 0.1
   groundCheck: {fileID: 8967913622833613943}
   groundMask:
     serializedVersion: 2
@@ -321,15 +321,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2121211aa611b6c468e3796e438ec037, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  drawSpeed: 0.5
-  damage: 10
-  range: 100
-  arrowSpawnPoint: {fileID: 6706964622122074728}
   arrowPrefab: {fileID: 5613741541748890808, guid: be29e597b25e5da41b8b7fd2907adc11, type: 3}
-  shootableLayers:
-    serializedVersion: 2
-    m_Bits: 64
-  animationController: {fileID: 8938395384982831266}
+  shootPoint: {fileID: 2761499645298788041}
+  shootForce: 20
+  shootCooldown: 0.5
 --- !u!114 &8938395384982831266
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -723,9 +718,9 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0.01
   far clip plane: 1000
-  field of view: 70.00001
+  field of view: 70
   orthographic: 0
   orthographic size: 5
   m_Depth: -1

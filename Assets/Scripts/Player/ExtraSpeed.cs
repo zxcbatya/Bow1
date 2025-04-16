@@ -12,7 +12,7 @@ namespace Player
             if (other.CompareTag("Block"))
             {
                 GameObject player = GameObject.Find("Player").gameObject;
-                PlayerMovement playerMovement = player.GetComponent<PlayerMovement>();
+                PlayerController playerMovement = player.GetComponent<PlayerController>();
 
                 if (playerMovement.isMoving && !playerMovement.isCrouching)
                 {
