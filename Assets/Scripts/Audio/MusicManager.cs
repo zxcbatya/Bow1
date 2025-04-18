@@ -16,7 +16,7 @@ namespace Audio
         [SerializeField] private float maxTimeBetweenTracks = 10f;
         
         // Название параметра громкости в аудио-миксере
-        [SerializeField] private string volumeParam = "Volume";
+        [SerializeField] private string volumeParam = "Music";
         
         private AudioSource _audioSource;
         private int _currentTrackIndex = -1;
