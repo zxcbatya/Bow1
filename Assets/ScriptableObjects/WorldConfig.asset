@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3faaa5d66854d9f9910c7810308e9c0, type: 3}
+  m_Name: WorldConfig
+  m_EditorClassIdentifier: 
+  spiralRadius: 18.1
+  blockSpacing: 10
+  heightStep: 1
+  initialBlocks: 50
+  rowsCount: 1
+  rowOffset: 0.5
+  initialRowDistance: 3
+  distanceBetweenRows: 1
+  blockDistanceInRow: 2
+  blocksInRow: 3
+  enemySpawnRadius: 25
+  minEnemyDistance: 15
+  enemySpawnRate: 2
+  maxEnemiesAtOnce: 5
+  maxBlocksInMemory: 1000
+  cleanupDistance: 150
+  blockLayerMask:
+    serializedVersion: 2
+    m_Bits: 8
+  blockScale: 1
+  blockVariation: 0.1
+  playerSpawnHeight: 2
+  maxJumpDistance: 3
+  parkourDensity: 0.7
+  blockPrefab: {fileID: 8074084156228026447, guid: aff1b909f82e66e44855fda11d5ea13d, type: 3}
+  enemyPrefab: {fileID: 1241990753527475708, guid: d281fcce2324d544fb510c55469b34f7, type: 3}
+  arrowPrefab: {fileID: 5613741541748890808, guid: be29e597b25e5da41b8b7fd2907adc11, type: 3}
