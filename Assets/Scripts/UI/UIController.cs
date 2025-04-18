@@ -3,54 +3,63 @@ namespace UI
     using UnityEngine;
     using UnityEngine.UI;
 
-    public class UIController : MonoBehaviour
+    public class UIController : MonoBehaviour, IUIManager
     {
-        [Header("Main UI Components")] [SerializeField]
-        private Canvas _mainCanvas;
+        [Header("UI Elements")]
+        [SerializeField] private MainMenu _mainMenu;
+        [SerializeField] private GameUI _gameUI;
+        [SerializeField] private PauseMenu _pauseMenu;
 
-        [SerializeField] private CanvasGroup _mainMenu;
-        [SerializeField] private CanvasGroup _gameUI;
-        [SerializeField] private CanvasGroup _pauseMenu;
-
-        [Header("Buttons")] [SerializeField] private Button _playButton;
-        [SerializeField] private Button _resumeButton;
-        [SerializeField] private Button _exitButton;
-
-        public void Initialize(System.Action onPlay, System.Action onResume)
+        private void Awake()
         {
-            _playButton.onClick.AddListener(() => onPlay?.Invoke());
-            _resumeButton.onClick.AddListener(() => onResume?.Invoke());
-            _exitButton.onClick.AddListener(Application.Quit);
+            Initialize();
+        }
 
-            ShowMainMenu();
+        public void Initialize()
+        {
+            if (_mainMenu != null) _mainMenu.Initialize(StartGame, ResumeGame);
+            if (_gameUI != null) _gameUI.Initialize();
+            if (_pauseMenu != null) _pauseMenu.Initialize(ResumeGame, ShowMainMenu, ShowSettings);
+        }
+
+        private void StartGame()
+        {
+            ShowGameUI();
+        }
+
+        private void ResumeGame()
+        {
+            ShowGameUI();
+        }
+
+        private void ShowSettings()
+        {
+            // TODO: Реализовать показ настроек
         }
 
         public void ShowMainMenu()
         {
-            SetUIState(_mainMenu, true);
-            SetUIState(_gameUI, false);
-            SetUIState(_pauseMenu, false);
+            HideAll();
+            if (_mainMenu != null) _mainMenu.Show();
         }
 
         public void ShowGameUI()
         {
-            SetUIState(_mainMenu, false);
-            SetUIState(_gameUI, true);
-            SetUIState(_pauseMenu, false);
+            HideAll();
+            if (_gameUI != null) _gameUI.Show();
         }
 
         public void ShowPauseMenu()
         {
-            SetUIState(_mainMenu, false);
-            SetUIState(_gameUI, false);
-            SetUIState(_pauseMenu, true);
+            HideAll();
+            if (_pauseMenu != null) _pauseMenu.Show();
         }
 
-        private void SetUIState(CanvasGroup group, bool state)
+        private void HideAll()
         {
-            group.alpha = state ? 1 : 0;
-            group.interactable = state;
-            group.blocksRaycasts = state;
+            if (_mainMenu != null) _mainMenu.Hide();
+            if (_gameUI != null) _gameUI.Hide();
+            if (_pauseMenu != null) _pauseMenu.Hide();
         }
     }
 }

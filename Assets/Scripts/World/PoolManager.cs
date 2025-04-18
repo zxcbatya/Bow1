@@ -7,92 +7,135 @@ namespace World
 {
     public class PoolManager : IPoolManager
     {
-        private ObjectPool<GameObject> _blockPool;
-        private ObjectPool<GameObject> _enemyPool;
-        private ObjectPool<GameObject> _arrowPool;
+        private AdvancedObjectPool _blockPool;
+        private AdvancedObjectPool _enemyPool;
+        private AdvancedObjectPool _arrowPool;
 
-        public int ActiveBlocksCount => _blockPool.ActiveCount; // Добавляем реализацию свойства
+        public int ActiveBlocksCount => _blockPool.ActiveCount;
 
-        public PoolManager(
-            GameObject blockPrefab,
-            GameObject enemyPrefab,
-            GameObject arrowPrefab,
-            int maxBlocks
-        )
+        public PoolManager(WorldSettings settings)
         {
-            _blockPool = new ObjectPool<GameObject>(
-                () => Object.Instantiate(blockPrefab),
-                obj => obj.SetActive(true),
-                obj => obj.SetActive(false),
-                maxBlocks
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+    
+            _blockPool = new AdvancedObjectPool(
+                settings.blockPrefab, 
+                settings.maxBlocksInMemory, 
+                "Block"
             );
-
-            _enemyPool = new ObjectPool<GameObject>(
-                () => Object.Instantiate(enemyPrefab),
-                obj => obj.SetActive(true),
-                obj => obj.SetActive(false),
-                50 // Максимум врагов
+    
+            _enemyPool = new AdvancedObjectPool(
+                settings.enemyPrefab,
+                settings.maxEnemiesAtOnce * 2,
+                "Enemy"
             );
-
-            _arrowPool = new ObjectPool<GameObject>(
-                () => Object.Instantiate(arrowPrefab),
-                obj => obj.SetActive(true),
-                obj => obj.SetActive(false),
-                100 // Максимум стрел
+    
+            _arrowPool = new AdvancedObjectPool(
+                settings.arrowPrefab,
+                100,
+                "Arrow"
             );
         }
+        public GameObject GetBlock() => _blockPool.GetObject();
+        public void ReturnBlock(GameObject obj) => _blockPool.ReturnObject(obj);
 
-        public GameObject GetBlock() => _blockPool.Get();
-        public void ReturnBlock(GameObject obj) => _blockPool.Release(obj);
+        public GameObject GetEnemy() => _enemyPool.GetObject();
+        public void ReturnEnemy(GameObject obj) => _enemyPool.ReturnObject(obj);
 
-        public GameObject GetEnemy() => _enemyPool.Get();
-        public void ReturnEnemy(GameObject obj) => _enemyPool.Release(obj);
-
-        public GameObject GetEnemyProjectile() => _arrowPool.Get();
-        public void ReturnEnemyProjectile(GameObject obj) => _arrowPool.Release(obj);
+        public GameObject GetEnemyProjectile() => _arrowPool.GetObject();
+        public void ReturnEnemyProjectile(GameObject obj) => _arrowPool.ReturnObject(obj);
     }
 
-    public class ObjectPool<T> where T : class
+    public class AdvancedObjectPool
     {
-        private Queue<T> _pool = new Queue<T>();
-        private Func<T> _createFunc;
-        private Action<T> _onGet;
-        private Action<T> _onRelease;
+        private GameObject _prefab;
         private int _maxSize;
-        private int _activeCount; // Добавляем счетчик
-
-        public int ActiveCount => _activeCount; // Новое свойство
-
-        public ObjectPool(
-            Func<T> createFunc,
-            Action<T> onGet = null,
-            Action<T> onRelease = null,
-            int maxSize = int.MaxValue)
+        private string _name;
+        private Transform _poolContainer;
+        
+        // Используем HashSet для быстрой проверки, активен ли объект
+        private HashSet<GameObject> _activeObjects = new HashSet<GameObject>();
+        private Queue<GameObject> _inactiveObjects = new Queue<GameObject>();
+        
+        public int ActiveCount => _activeObjects.Count;
+        
+        public AdvancedObjectPool(GameObject prefab, int maxSize, string name)
         {
-            _createFunc = createFunc;
-            _onGet = onGet;
-            _onRelease = onRelease;
+            _prefab = prefab;
             _maxSize = maxSize;
-        }
-
-        public T Get()
-        {
-            T item = _pool.Count > 0
-                ? _pool.Dequeue()
-                : _createFunc();
-
-            _onGet?.Invoke(item);
-            _activeCount++; // Увеличиваем счетчик
-            return item;
-        }
-
-        public void Release(T item)
-        {
-            if (_pool.Count < _maxSize)
+            _name = name;
+            
+            // Создаем контейнер для объектов пула
+            GameObject container = new GameObject($"{name}Pool");
+            _poolContainer = container.transform;
+            Object.DontDestroyOnLoad(container);
+            
+            // Предварительно создаем объекты (до 20% от максимума)
+            int preWarmCount = Mathf.Min(maxSize, 20);
+            for (int i = 0; i < preWarmCount; i++)
             {
-                _onRelease?.Invoke(item);
-                _pool.Enqueue(item);
-                _activeCount--; // Уменьшаем счетчик
+                GameObject obj = CreateNewInstance();
+                _inactiveObjects.Enqueue(obj);
+            }
+        }
+        
+        private GameObject CreateNewInstance()
+        {
+            GameObject instance = Object.Instantiate(_prefab, _poolContainer);
+            instance.name = $"{_name}_{_activeObjects.Count + _inactiveObjects.Count}";
+            instance.SetActive(false);
+            return instance;
+        }
+        
+        public GameObject GetObject()
+        {
+            GameObject obj;
+            
+            if (_inactiveObjects.Count > 0)
+            {
+                obj = _inactiveObjects.Dequeue();
+            }
+            else if (_activeObjects.Count < _maxSize)
+            {
+                obj = CreateNewInstance();
+            }
+            else
+            {
+                Debug.LogWarning($"Pool {_name} is at maximum capacity ({_maxSize})!");
+                return null;
+            }
+            
+            obj.SetActive(true);
+            _activeObjects.Add(obj);
+            return obj;
+        }
+        
+        public void ReturnObject(GameObject obj)
+        {
+            if (obj == null || !_activeObjects.Contains(obj))
+            {
+                return;
+            }
+            
+            obj.SetActive(false);
+            _activeObjects.Remove(obj);
+            
+            // Перемещаем объект в контейнер пула
+            obj.transform.SetParent(_poolContainer);
+            
+            // Сбрасываем трансформацию
+            obj.transform.localPosition = Vector3.zero;
+            obj.transform.localRotation = Quaternion.identity;
+            obj.transform.localScale = Vector3.one;
+            
+            _inactiveObjects.Enqueue(obj);
+        }
+        
+        public void ReturnAllObjects()
+        {
+            List<GameObject> objectsToReturn = new List<GameObject>(_activeObjects);
+            foreach (var obj in objectsToReturn)
+            {
+                ReturnObject(obj);
             }
         }
     }

@@ -52,14 +52,18 @@
     <Compile Include="Assets\Scripts\UI\MainMenu.cs" />
     <Compile Include="Assets\Scripts\Combat\Interfaces\IPlayerHealth.cs" />
     <Compile Include="Assets\Scripts\World\Score\ScoreView.cs" />
+    <Compile Include="Assets\Scripts\UI\IUIManager.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerShoting.cs" />
+    <Compile Include="Assets\Scripts\UI\BaseUIElement.cs" />
     <Compile Include="Assets\Scripts\Enemies\EnemyStateController.cs" />
     <Compile Include="Assets\Scripts\World\DifficultyManager.cs" />
     <Compile Include="Assets\Scripts\World\ObjectPool.cs" />
     <Compile Include="Assets\Scripts\World\Score\ScoreModel.cs" />
     <Compile Include="Assets\Scripts\World\WorldSettings.cs" />
     <Compile Include="Assets\Scripts\Audio\MusicManager.cs" />
+    <Compile Include="Assets\Scripts\UI\HealthBar.cs" />
     <Compile Include="Assets\Scripts\World\ScoreCounter.cs" />
+    <Compile Include="Assets\Scripts\UI\PauseMenu.cs" />
     <Compile Include="Assets\Scripts\UI\UIController.cs" />
     <Compile Include="Assets\Scripts\Utils\ObjectPool.cs" />
     <Compile Include="Assets\Scripts\World\IWorldGenerator.cs" />
@@ -73,6 +77,7 @@
     <Compile Include="Assets\Scripts\World\EnemySpawner.cs" />
     <Compile Include="Assets\Scripts\Player\ExtraSpeed.cs" />
     <Compile Include="Assets\Scripts\World\WorldController.cs" />
+    <Compile Include="Assets\Scripts\UI\GameUI.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerHealth.cs" />
     <Compile Include="Assets\Scripts\World\ScoreManager.cs" />
     <Compile Include="Assets\Scripts\Core\GameManager.cs" />

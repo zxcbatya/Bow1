@@ -7,22 +7,44 @@ namespace Core
     public class GameManager : MonoBehaviour
     {
         [Header("Dependencies")]
-        [SerializeField] private SpiralWorldGenerator _worldGenerator;
+        [SerializeField] private StructuredSpiralGenerator _worldGenerator;
         [SerializeField] private UIController _uiController;
-    
+        
+        private bool _gameStarted = false;
         private bool _isPaused;
 
         private void Awake()
         {
-            _uiController.Initialize(StartGame, ResumeGame);
-            _worldGenerator.GenerateInitial();
+            if (_uiController != null)
+            {
+                _uiController.Initialize();
+            }
+            else
+            {
+                Debug.LogError("UIController не назначен в инспекторе!", this);
+            }
+        }
+        
+        private void Start()
+        {
+            // При запуске игры сразу показываем главное меню
+            if (_uiController != null)
+            {
+                _uiController.ShowMainMenu();
+                Time.timeScale = 1f; // Останавливаем время до начала игры
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
         }
 
-        private void StartGame()
+        public void StartGame()
         {
-            _uiController.ShowGameUI();
+            _gameStarted = true;
+            _isPaused = false;
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            _uiController.ShowGameUI();
         }
 
         private void ResumeGame()
@@ -31,16 +53,29 @@ namespace Core
             _uiController.ShowGameUI();
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (_uiController == null) return;
+            
+            if (_gameStarted && Input.GetKeyDown(KeyCode.Escape))
             {
                 _isPaused = !_isPaused;
                 Time.timeScale = _isPaused ? 0 : 1;
-                _uiController.ShowPauseMenu();
-                Cursor.lockState = _isPaused ? CursorLockMode.None : CursorLockMode.Locked;
+                if (_isPaused)
+                {
+                    _uiController.ShowPauseMenu();
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+                else
+                {
+                    _uiController.ShowGameUI();
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
             }
         }
     }

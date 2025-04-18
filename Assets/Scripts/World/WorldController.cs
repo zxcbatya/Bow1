@@ -1,96 +1,166 @@
-using Enemies;
 using UnityEngine;
-using Enemies.Enemies.Components;
+using System.Collections;
+using System.Linq;
 
 namespace World
 {
     public class WorldController : MonoBehaviour 
     {
-        [Header("Настройки")]
+        [Header("Settings")]
         [SerializeField] private WorldSettings _settings;
-        [SerializeField] private GameObject _blockPrefab;
-        [SerializeField] private GameObject _enemyPrefab;
-        [SerializeField] private GameObject _arrowPrefab; 
         [SerializeField] private Transform _player;
         
-        [Header("Генератор")]
-        [SerializeField] private SpiralWorldGenerator _worldGenerator;
+        [Header("Components")]
+        [SerializeField] private StructuredSpiralGenerator _worldGenerator;
+        [SerializeField] private EnemySpawner _enemySpawner;
         
         private IPoolManager _poolManager;
-        private IEnemySpawner _enemySpawner;
+        private Vector3 _lastSafePosition;
         private float _nextSpawnCheckTime;
-
-        private void Awake() 
+        private int _activeEnemiesCount;
+        
+        private void ValidateReferences()
         {
-            _poolManager = new PoolManager(
-                _blockPrefab,
-                _enemyPrefab,
-                _arrowPrefab, 
-                _settings.maxBlocksInMemory 
-            );
-
-            _worldGenerator.Initialize(_poolManager, _settings);
-            _worldGenerator.GenerateInitial();
-
-            _enemySpawner = GetComponent<EnemySpawner>();
-            _enemySpawner.Initialize(_poolManager, _settings);
-            var enemy = _poolManager.GetEnemy();
-            if (enemy.TryGetComponent<EnemySkeleton>(out var skeleton))
+            if (_settings == null || _player == null || _worldGenerator == null)
             {
-                skeleton.Initialize(_poolManager, _player); // Передаём игрока
-                skeleton.GetComponent<EnemyStateController>().ResetEnemy();
+                Debug.LogError("Essential references missing!", gameObject);
+                enabled = false;
+            }
+        }
+
+        private IEnumerator InitializeSystemsCoroutine()
+        {
+            _poolManager = new PoolManager(_settings);
+            _worldGenerator.Initialize(_poolManager, _settings, _player);
+            _worldGenerator.GenerateInitial();
+    
+            yield return null; // Ждем завершения одного кадра
+    
+            PlacePlayerImmediately();
+    
+            if (_enemySpawner != null)
+            {
+                _enemySpawner.Initialize(_poolManager, _settings);
+                StartCoroutine(SpawnEnemiesRoutine());
+            }
+        }
+
+        private void Awake()
+        {
+            ValidateReferences();
+
+            StartCoroutine(InitializeSystemsCoroutine());
+        }
+
+        private void PlacePlayerImmediately()
+        {
+            var startBlock = _worldGenerator.GetActiveBlocks().FirstOrDefault();
+            if (startBlock != null)
+            {
+                _player.position = GetBlockSurfacePosition(startBlock);
+                _lastSafePosition = _player.position;
+            }
+            else
+            {
+                Debug.LogError("Failed to find initial block!");
+            }
+        }
+
+        private Vector3 GetBlockSurfacePosition(GameObject block)
+        {
+            var collider = block.GetComponent<Collider>();
+            return collider != null 
+                ? collider.bounds.center + Vector3.up * collider.bounds.extents.y
+                : block.transform.position + Vector3.up;
+        }
+
+        private IEnumerator SpawnEnemiesRoutine()
+        {
+            yield return new WaitForSeconds(3f);
+            while (true)
+            {
+                if (ShouldSpawnEnemy())
+                {
+                    TrySpawnEnemy();
+                }
+                yield return new WaitForSeconds(1f / _settings.enemySpawnRate);
             }
         }
 
         private void Update()
         {
-            UpdateGeneration();
-            UpdateEnemySpawning();
-            CleanupOldBlocks();
+            UpdateWorldGeneration();
+            CheckPlayerSafety();
         }
 
-        private void UpdateGeneration()
+        private void UpdateWorldGeneration()
         {
-            if (ShouldGenerateMoreBlocks())
+            if (Vector3.Distance(_player.position, _worldGenerator.LastGeneratedPosition) > 20f)
             {
                 _worldGenerator.GenerateNextSection();
             }
         }
 
-        private bool ShouldGenerateMoreBlocks()
+        private void CheckPlayerSafety()
         {
-            return _poolManager.ActiveBlocksCount < _settings.maxBlocksInMemory;
-        }
-
-        private void UpdateEnemySpawning()
-        {
-            if (Time.time > _nextSpawnCheckTime)
+            if (_player.position.y < -50f)
             {
-                TrySpawnEnemyGroup();
-                _nextSpawnCheckTime = Time.time + Random.Range(5f, 10f);
+                RespawnPlayer();
+                return;
+            }
+
+            if (Time.time % 2f < Time.deltaTime)
+            {
+                UpdateSafePosition();
             }
         }
 
-        private void TrySpawnEnemyGroup()
+        private void UpdateSafePosition()
         {
-            for (int i = 0; i < 3; i++)
+            var nearestBlock = FindNearestBlock(_player.position);
+            if (nearestBlock != null)
             {
-                var spawnPos = GetRandomSpawnPosition();
-                if (spawnPos != Vector3.zero)
-                {
-                    _enemySpawner.TrySpawnEnemy(spawnPos);
-                }
+                _lastSafePosition = GetBlockSurfacePosition(nearestBlock);
             }
         }
 
-        private Vector3 GetRandomSpawnPosition()
+        private GameObject FindNearestBlock(Vector3 position)
         {
-            var angle = Random.Range(0f, Mathf.PI * 2f);
-            return new Vector3(
-                Mathf.Cos(angle) * _settings.spiralRadius,
-                _player.position.y,
-                Mathf.Sin(angle) * _settings.spiralRadius
-            );
+            return _worldGenerator.GetActiveBlocks()
+                .OrderBy(b => Vector3.Distance(b.transform.position, position))
+                .FirstOrDefault();
+        }
+
+        private void RespawnPlayer()
+        {
+            _player.position = _lastSafePosition;
+            var rb = _player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
+
+        private bool ShouldSpawnEnemy()
+        {
+            return _activeEnemiesCount < _settings.maxEnemiesAtOnce 
+                && _enemySpawner != null 
+                && _poolManager != null;
+        }
+
+        private void TrySpawnEnemy()
+        {
+            var spawnPos = _enemySpawner.GetSafeSpawnPosition(_player.position);
+            if (spawnPos.HasValue && _enemySpawner.TrySpawnEnemy(spawnPos.Value))
+            {
+                _activeEnemiesCount++;
+            }
+        }
+
+        public void OnEnemyDestroyed()
+        {
+            _activeEnemiesCount = Mathf.Max(0, _activeEnemiesCount - 1);
         }
 
         private void CleanupOldBlocks()

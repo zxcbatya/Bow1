@@ -68,12 +68,47 @@ namespace Enemies
         #endregion
 
         #region Update logic
+        private float _updateInterval = 0.1f; // Обновляем поведение только каждые 0.1 секунды
+        private float _updateTimer = 0f;
+        private bool _isPlayerVisible = false;
+        private float _distanceToPlayer = float.MaxValue;
+
         private void Update()
         {
             if (!_stateController.IsActive) return;
             
-            UpdateAim();
-            UpdateShooting();
+            _updateTimer += Time.deltaTime;
+            if (_updateTimer >= _updateInterval)
+            {
+                _updateTimer = 0f;
+                CheckPlayerVisibility();
+            }
+            
+            // Вращение к игроку и стрельба только если игрок виден
+            if (_isPlayerVisible)
+            {
+                UpdateAim();
+                UpdateShooting();
+            }
+        }
+
+        private void CheckPlayerVisibility()
+        {
+            if (_player == null) return;
+            
+            _distanceToPlayer = Vector3.Distance(transform.position, _player.position);
+            
+            // Если игрок слишком далеко, нет смысла проверять видимость
+            if (_distanceToPlayer > 40f)
+            {
+                _isPlayerVisible = false;
+                return;
+            }
+            
+            // Проверяем только если игрок не слишком далеко
+            Vector3 directionToPlayer = (_player.position - transform.position).normalized;
+            _isPlayerVisible = !Physics.Raycast(transform.position, directionToPlayer, _distanceToPlayer, 
+                LayerMask.GetMask("Ground", "Default"));
         }
 
         private void UpdateAim()
@@ -92,7 +127,7 @@ namespace Enemies
 
         private void UpdateShooting()
         {
-            if (Vector3.Distance(transform.position, _player.position) > 40f) return;
+            if (_distanceToPlayer > 40f) return;
 
             _shootTimer += Time.deltaTime;
             

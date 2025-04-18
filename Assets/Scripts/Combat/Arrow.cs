@@ -113,7 +113,17 @@ namespace Combat
 
         public void ReturnToPool()
         {
+            if (this == null || gameObject == null) return;
+            
             SetTrailActive(false);
+            
+            if (_poolManager == null)
+            {
+                Debug.LogWarning("Arrow: _poolManager is null, destroying object instead", this);
+                Destroy(gameObject);
+                return;
+            }
+            
             _poolManager.ReturnEnemyProjectile(gameObject);
         }
 
